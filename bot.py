@@ -25,7 +25,7 @@ ACCOUNT_USER_ID = "1269034001639059459"
 TRACK = "#quedijo sobre"
 
 
-class ReplyToTweet(StreamListener):
+class QueDijoBot(StreamListener):
     calls_per_window = 180
     remaining_calls = 180
     rate_limit_seconds = 15 * 60
@@ -186,6 +186,6 @@ if __name__ == "__main__":
         auth.secure = True
         auth.set_access_token(ACCESS_TOKEN_KEY, ACCESS_TOKEN_SECRET)
         api = API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True)
-        streamListener = ReplyToTweet(api)
+        streamListener = QueDijoBot(api)
         twitterStream = Stream(auth, streamListener)
         twitterStream.filter(track=[TRACK])
