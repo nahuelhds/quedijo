@@ -34,12 +34,18 @@ class QueDijoBot(StreamListener):
         self.api = twitter_api
 
     def wait_rate_limit(self):
+        print(
+            "Waiting %s seconds for avoiding rate limit window"
+            % self.rate_limit_seconds
+        )
         time.sleep(self.rate_limit_seconds)
 
     def post_status(self, text, in_reply_to_status_id=None):
+        print("Remaining calls: %s" % self.remaining_calls)
         if self.remaining_calls == 0:
             self.wait_rate_limit()
             self.remaining_calls = self.calls_per_window
+            print("Remaining calls resetted to %s " % self.remaining_calls)
 
         self.remaining_calls -= 1
 
@@ -50,8 +56,11 @@ class QueDijoBot(StreamListener):
                 in_reply_to_status_id=in_reply_to_status_id,
                 auto_populate_reply_metadata=True,
             )
+            print("Posted status id" % status.id_str)
         except TweepError:
+            print("An error ocurred")
             self.wait_rate_limit()
+            print("Retrying...")
             status = self.post_status(text, in_reply_to_status_id)
 
         return status
@@ -60,7 +69,9 @@ class QueDijoBot(StreamListener):
         return textwrap.shorten(text, width=280, placeholder="...")
 
     def wait_like_a_human(self):
-        time.sleep(random.randint(3, 60))
+        seconds = random.randint(3, 60)
+        print("Waiting %s seconds like a human" % seconds)
+        time.sleep(seconds)
 
     def on_data(self, data):
         if not data:
@@ -69,7 +80,7 @@ class QueDijoBot(StreamListener):
         tweet = json.loads(str(data).strip())
         requesting_user = tweet.get("user", {}).get("screen_name")
 
-        if requesting_user != "nahuelhds":
+        if requesting_user != "nahuelhds" or requesting_user != "quedijo__":
             print("no soy yo sino @%s. Omitiendo por ahora..." % requesting_user)
             return
 
