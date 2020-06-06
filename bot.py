@@ -1,10 +1,12 @@
 import argparse
 import json
+import textwrap
+import GetOldTweets3 as got
+
 from dotenv import load_dotenv
 from os import environ
 from expiringdict import ExpiringDict
 from tweepy.streaming import StreamListener
-from tweepy import Cursor
 from tweepy import OAuthHandler
 from tweepy import Stream
 from tweepy import API
@@ -39,39 +41,60 @@ class ReplyToTweet(StreamListener):
         print(tweet)
 
         requesting_user = tweet.get("user", {}).get("screen_name")
-        requesting_tweet_id = tweet.get("id_str")
+        requesting_tweet_id_str = tweet.get("id_str")
         mentioned_user = (
             tweet.get("entities", {}).get("user_mentions", [])[0].get("screen_name")
         )
         query = extract_query_from_tweet(tweet.get("text"), mentioned_user)
 
-        thread = ['Esto fue lo que dijo @%s sobre "%s"' % (mentioned_user, query)]
-        results = Cursor(
-            self.api.search, q="from:%s %s" % (mentioned_user, query)
-        ).items()
-        for result in results:
-            print(result)
-            thread.append("https://twitter.com/%s/%s" % (mentioned_user, result.id_str))
-        print(thread)
-        # check if we already replied to this user and when
-        # rate limit replies per user
-        # update rate for this user
-        # existing_rate = int(0 if self.__rate_limits_per_user.get(requesting_user) is None else self.__rate_limits_per_user.get(requesting_user))
-        # self.__rate_limits_per_user[requesting_user] = existing_rate + 1
-        #
-        # # check rate limit, and reply accordingly
-        # if (existing_rate == self.__max_per_user):
-        #     replyText = '@' + requesting_user + ' llegaste a tu límite de peticiones. Probá en un rato.'
-        #     # api.update_status(status=replyText, in_reply_to_status_id=tweetId)
-        #     print("replied to this user, saying he/she should wait.")
-        #     return
-        # elif (existing_rate > self.__max_per_user):
-        #     print("*already* replied to this user, he/she should wait for an hour, ignoring.")
-        #     return
-        #
-        # # replyText = '@' + screenName +" "+ self.response("")
-        # print("%s | %s" % (replyText, "https://twitter.com/%s/status/%s" % (requesting_user, requesting_tweet_id)))
-        # api.update_status(status=replyText, in_reply_to_status_id=tweetId)
+        thread = []
+        criteria = (
+            got.manager.TweetCriteria()
+            .setQuerySearch("from:%s %s" % (mentioned_user, query))
+            .setTopTweets(True)
+        )
+        for result in got.manager.TweetManager.getTweets(criteria):
+            thread.append(result.permalink)
+
+        if len(thread) == 0:
+            print("Nothing found. Replying...")
+            last_tweet = self.api.update_status(
+                "No encontré nada al respecto 🤔",
+                in_reply_to_status_id=requesting_tweet_id_str,
+                auto_populate_reply_metadata=True,
+            )
+        else:
+            print("Creating thread...")
+            text = 'Esto fue lo que dijo @%s sobre "%s"' % (mentioned_user, query)
+            last_tweet = self.api.update_status(build_status(text))
+            thread_id_str = last_tweet.id_str
+            print(
+                "Thread: https://twitter.com/%s/status/%s"
+                % (ACCOUNT_SCREEN_NAME, thread_id_str)
+            )
+            for text in thread:
+                last_tweet = self.api.update_status(
+                    build_status(text),
+                    in_reply_to_status_id=last_tweet.id_str,
+                    auto_populate_reply_metadata=True,
+                )
+                print(
+                    "Tweet: https://twitter.com/%s/status/%s"
+                    % (ACCOUNT_SCREEN_NAME, thread_id_str)
+                )
+
+            print("Replying to request...")
+            self.api.update_status(
+                "https://twitter.com/%s/status/%s"
+                % (ACCOUNT_SCREEN_NAME, thread_id_str),
+                in_reply_to_status_id=requesting_tweet_id_str,
+                auto_populate_reply_metadata=True,
+            )
+
+        print(
+            "Replied:  https://twitter.com/%s/status/%s"
+            % (ACCOUNT_SCREEN_NAME, last_tweet.id_str)
+        )
         return
 
     def on_error(self, status):
@@ -100,6 +123,10 @@ def get_auth_link_and_show_token():
     print("\nThese are your access token and secret.\nDO NOT SHARE THEM WITH ANYONE!\n")
     print("ACCESS_TOKEN\n%s\n" % token[0])
     print("ACCESS_TOKEN_SECRET\n%s\n" % token[1])
+
+
+def build_status(text):
+    return textwrap.shorten(text, width=280, placeholder="...")
 
 
 if __name__ == "__main__":
