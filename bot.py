@@ -80,7 +80,7 @@ class QueDijoBot(StreamListener):
         tweet = json.loads(str(data).strip())
         requesting_user = tweet.get("user", {}).get("screen_name")
 
-        if requesting_user != "nahuelhds" or requesting_user != "quedijo__":
+        if requesting_user != "nahuelhds" and requesting_user != "quedijo__":
             print("no soy yo sino @%s. Omitiendo por ahora..." % requesting_user)
             return
 
